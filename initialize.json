@@ -1,0 +1,4 @@
+{
+  "payment_service_url":"http://54.168.35.223:5555",
+  "shipment_service_url":"http://54.168.35.223:7000"
+}
