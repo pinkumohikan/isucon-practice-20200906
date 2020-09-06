@@ -701,10 +701,27 @@ func getNewCategoryItems(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+
+	userIdUnique := make(map[int64]struct{})
+	var userIds []interface{}
+	for _, i := range items {
+		id := i.SellerID
+		if _, ok := userIdUnique[id]; !ok {
+			userIds = append(userIds, id)
+			userIdUnique[id] = struct{}{}
+		}
+	}
+	var userSimple map[int64]UserSimple
+	tx := dbx.MustBegin()
+	userSimple, done := getUsers(w, userIds, tx, userSimple)
+	if done {
+		return
+	}
+
 	itemSimples := []ItemSimple{}
 	for _, item := range items {
-		seller, err := getUserSimpleByID(dbx, item.SellerID)
-		if err != nil {
+		seller, ok := userSimple[item.SellerID]
+		if !ok {
 			outputErrorMsg(w, http.StatusNotFound, "seller not found")
 			return
 		}
