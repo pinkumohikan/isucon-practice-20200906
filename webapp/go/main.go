@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -1395,19 +1396,19 @@ func postBuy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	scr, err := APIShipmentCreate(getShipmentServiceURL(), &APIShipmentCreateReq{
-		ToAddress:   buyer.Address,
-		ToName:      buyer.AccountName,
-		FromAddress: seller.Address,
-		FromName:    seller.AccountName,
-	})
-	if err != nil {
-		log.Print(err)
-		outputErrorMsg(w, http.StatusInternalServerError, "failed to request to shipment service")
-		tx.Rollback()
-
-		return
-	}
+	var wg sync.WaitGroup
+	var scr *APIShipmentCreateRes
+	var shipErr error
+	wg.Add(1)
+	func() {
+		defer wg.Done()
+		scr, shipErr = APIShipmentCreate(getShipmentServiceURL(), &APIShipmentCreateReq{
+			ToAddress:   buyer.Address,
+			ToName:      buyer.AccountName,
+			FromAddress: seller.Address,
+			FromName:    seller.AccountName,
+		})
+	}()
 
 	pstr, err := APIPaymentToken(getPaymentServiceURL(), &APIPaymentServiceTokenReq{
 		ShopID: PaymentServiceIsucariShopID,
@@ -1415,6 +1416,16 @@ func postBuy(w http.ResponseWriter, r *http.Request) {
 		APIKey: PaymentServiceIsucariAPIKey,
 		Price:  targetItem.Price,
 	})
+
+	wg.Wait()
+	if shipErr != nil {
+		log.Print(shipErr)
+		outputErrorMsg(w, http.StatusInternalServerError, "failed to request to shipment service")
+		tx.Rollback()
+
+		return
+	}
+
 	if err != nil {
 		log.Print(err)
 
