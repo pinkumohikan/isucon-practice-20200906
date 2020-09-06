@@ -320,6 +320,9 @@ func main() {
 	}
 	defer dbx.Close()
 
+	dbx.SetMaxOpenConns(100)
+	dbx.SetMaxIdleConns(100)
+
 	var categories []Category
 	err = dbx.Select(&categories, "SELECT id,parent_id,category_name FROM `categories`")
 	if err != nil {
