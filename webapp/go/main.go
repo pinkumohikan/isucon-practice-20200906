@@ -63,7 +63,7 @@ var (
 	templates   *template.Template
 	dbx         *sqlx.DB
 	store       sessions.Store
-	categoryMap map[int64]Category
+	categoryMap map[int]Category
 )
 
 type Config struct {
@@ -321,14 +321,14 @@ func main() {
 	defer dbx.Close()
 
 	// TODO: categoryをselectしてid => Categoryなmapを作る
-	var categoryMap map[int64]Category
+	var categoryMap map[int]Category
 
 	// カテゴリ全部撮ってくる
 	var categories []Category
 	err = sqlx.Get(dbx, &categories, "SELECT id,parent_id,category_name FROM `categories`")
 
 	// parentnameのmap作る
-	var parentNames map[int64]string
+	var parentNames map[int]string
 	for _, c := range categories {
 		if c.ParentID == 0 {
 			parentNames[c.ID] = c.CategoryName
