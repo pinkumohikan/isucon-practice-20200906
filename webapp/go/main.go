@@ -321,7 +321,7 @@ func main() {
 	defer dbx.Close()
 
 	var categories []Category
-	err = sqlx.Get(dbx, &categories, "SELECT id,parent_id,category_name FROM `categories`")
+	err = dbx.Select(&categories, "SELECT id,parent_id,category_name FROM `categories`")
 	if err != nil {
 		log.Fatalf("failed to create categories: %s.", err.Error())
 	}
