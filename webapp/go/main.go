@@ -1372,6 +1372,7 @@ func postBuy(w http.ResponseWriter, r *http.Request) {
 
 	transactionEvidenceID, errored := buy(w, result, err, targetItem, buyer, category, seller, rb)
 	if errored {
+		log.Println("errorだーーーーーーー")
 		// 販売中状態に戻す
 		_, _ = dbx.Exec("UPDATE `items` SET `buyer_id` = null, `status` = ?, `updated_at` = ? WHERE `id` = ? and `status` = ?",
 			ItemStatusOnSale,
