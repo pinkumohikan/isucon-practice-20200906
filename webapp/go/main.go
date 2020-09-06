@@ -979,7 +979,7 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 			tx.Rollback()
 			return
 		}
-		transactionEvidences = make(map[int64]TransactionEvidence, len(s))
+		shippings = make(map[int64]Shipping, len(s))
 		for _, c := range s {
 			shippings[c.TransactionEvidenceID] = c
 		}
