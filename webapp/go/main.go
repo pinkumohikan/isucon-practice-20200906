@@ -320,37 +320,21 @@ func main() {
 	}
 	defer dbx.Close()
 
-	// TODO: categoryをselectしてid => Categoryなmapを作る
-	var categoryMap map[int]Category
-
-	// カテゴリ全部撮ってくる
 	var categories []Category
 	err = sqlx.Get(dbx, &categories, "SELECT id,parent_id,category_name FROM `categories`")
-
-	// parentnameのmap作る
-	var parentNames map[int]string
-	for _, c := range categories {
-		if c.ParentID == 0 {
-			parentNames[c.ID] = c.CategoryName
-		}
+	if err != nil {
+		log.Fatalf("failed to connect to DB: %s.", err.Error())
 	}
 
-	// 親カテゴリnameを入れ込む
-	// ついでにcategoryMapも完成させちゃう
+	var categoryMap map[int]Category
 	for _, c := range categories {
-		categoryMap[c.ID] = Category{
-			ID:                 c.ID,
-			ParentID:           c.ParentID,
-			CategoryName:       c.CategoryName,
-			ParentCategoryName: parentNames[c.ParentID],
-		}
+		categoryMap[c.ID] = c
 	}
-	// categoryMap[1] = Category{
-	// 	ID:                 0,
-	// 	ParentID:           0,
-	// 	CategoryName:       "",
-	// 	ParentCategoryName: "",
-	// }
+
+	for _, c := range categories {
+		parent := categoryMap[c.ParentID]
+		c.ParentCategoryName = parent.CategoryName
+	}
 
 	mux := goji.NewMux()
 
