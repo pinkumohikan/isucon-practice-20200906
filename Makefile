@@ -39,7 +39,7 @@ truncate-logs:
 kataribe:
 	sudo cat /var/log/nginx/access.log | ../kataribe -f "../kataribe.toml"
 
-overwrite-server-conf:	start-services-app2:
+overwrite-server-conf:
 	sudo cp -f /home/isucon/isucari/servers/mysql/mysql.conf.d/mysqld.cnf /etc/mysql/mysql.conf.d/mysqld.cnf
 
 bench:
