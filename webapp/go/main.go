@@ -323,7 +323,7 @@ func main() {
 	var categories []Category
 	err = sqlx.Get(dbx, &categories, "SELECT id,parent_id,category_name FROM `categories`")
 	if err != nil {
-		log.Fatalf("failed to connect to DB: %s.", err.Error())
+		log.Fatalf("failed to create categories: %s.", err.Error())
 	}
 
 	var categoryMap map[int]Category
