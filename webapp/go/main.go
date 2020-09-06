@@ -1409,13 +1409,17 @@ func postBuy(w http.ResponseWriter, r *http.Request) {
 			FromName:    seller.AccountName,
 		})
 	}()
-
-	pstr, err := APIPaymentToken(getPaymentServiceURL(), &APIPaymentServiceTokenReq{
-		ShopID: PaymentServiceIsucariShopID,
-		Token:  rb.Token,
-		APIKey: PaymentServiceIsucariAPIKey,
-		Price:  targetItem.Price,
-	})
+	wg.Add(1)
+	var pstr *APIPaymentServiceTokenRes
+	var payErr error
+	func() {
+		pstr, payErr = APIPaymentToken(getPaymentServiceURL(), &APIPaymentServiceTokenReq{
+			ShopID: PaymentServiceIsucariShopID,
+			Token:  rb.Token,
+			APIKey: PaymentServiceIsucariAPIKey,
+			Price:  targetItem.Price,
+		})
+	}()
 
 	wg.Wait()
 	if shipErr != nil {
@@ -1426,7 +1430,7 @@ func postBuy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err != nil {
+	if payErr != nil {
 		log.Print(err)
 
 		outputErrorMsg(w, http.StatusInternalServerError, "payment service is failed")
