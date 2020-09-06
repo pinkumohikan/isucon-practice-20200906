@@ -1032,7 +1032,7 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 
 		transactionEvidence, ok := transactionEvidences[item.ID]
 		if ok {
-			shipping = shippings[transactionEvidence.ID]
+			shipping := shippings[transactionEvidence.ID]
 			ssr, err := APIShipmentStatus(getShipmentServiceURL(), &APIShipmentStatusReq{
 				ReserveID: shipping.ReserveID,
 			})
