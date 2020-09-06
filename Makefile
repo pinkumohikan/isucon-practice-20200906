@@ -14,20 +14,22 @@ sync-build-file-app3:
 stop-services:
 	sudo systemctl stop nginx
 	sudo systemctl stop isucari.golang
-	sudo systemctl stop mysql
+	#sudo systemctl stop mysql
 
 stop-services-app2:
 	ssh isucon@18.179.19.193 sudo systemctl stop isucari.golang
+	ssh isucon@18.179.19.193 sudo systemctl stop mysql
 
 stop-services-app3:
 	ssh isucon@103.4.14.236 sudo systemctl stop isucari.golang
 
 start-services:
-	sudo systemctl start mysql
+	#sudo systemctl start mysql
 	sudo systemctl start isucari.golang
 	sudo systemctl start nginx
 
 start-services-app2:
+	ssh isucon@18.179.19.193 sudo systemctl start mysql
 	ssh isucon@18.179.19.193 sudo systemctl start isucari.golang
 
 start-services-app3:
