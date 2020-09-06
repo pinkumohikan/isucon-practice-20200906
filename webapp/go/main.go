@@ -326,7 +326,6 @@ func main() {
 		log.Fatalf("failed to create categories: %s.", err.Error())
 	}
 
-	var categoryMap map[int]Category
 	categoryMap = map[int]Category{}
 	for _, c := range categories {
 		categoryMap[c.ID] = c
