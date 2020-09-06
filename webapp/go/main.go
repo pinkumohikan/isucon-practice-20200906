@@ -931,13 +931,15 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 	userIdUnique := make(map[int64]struct{})
 	var userIds []interface{}
 	for _, i := range items {
-		if _, ok := userIdUnique[i.SellerID]; !ok {
-			userIds = append(userIds, i.SellerID)
-			userIds[i.SellerID] = struct{}{}
+		id := i.SellerID
+		if _, ok := userIdUnique[id]; !ok {
+			userIds = append(userIds, id)
+			userIdUnique[id] = struct{}{}
 		}
+		id = i.BuyerID
 		if _, ok := userIdUnique[i.BuyerID]; !ok {
-			userIds = append(userIds, i.BuyerID)
-			userIds[i.BuyerID] = struct{}{}
+			userIds = append(userIds, id)
+			userIdUnique[id] = struct{}{}
 		}
 
 	}
