@@ -63,6 +63,7 @@ var (
 	templates *template.Template
 	dbx       *sqlx.DB
 	store     sessions.Store
+	categoryMap map[int64]Category
 )
 
 type Config struct {
@@ -318,6 +319,14 @@ func main() {
 		log.Fatalf("failed to connect to DB: %s.", err.Error())
 	}
 	defer dbx.Close()
+
+	// TODO: categoryをselectしてid => Categoryなmapを作る
+	categoryMap[1] = Category{
+		ID:                 0,
+		ParentID:           0,
+		CategoryName:       "",
+		ParentCategoryName: "",
+	}
 
 	mux := goji.NewMux()
 
