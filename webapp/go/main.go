@@ -327,6 +327,7 @@ func main() {
 	}
 
 	var categoryMap map[int]Category
+	categoryMap = map[int]Category{}
 	for _, c := range categories {
 		categoryMap[c.ID] = c
 	}
