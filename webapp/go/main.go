@@ -963,13 +963,38 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 			userIds = append(userIds, id)
 			userIdUnique[id] = struct{}{}
 		}
-
+	}
+	var itemIds []interface{}
+	for _, j := range items {
+		itemIds = append(itemIds, j.ID)
 	}
 
 	var userSimples map[int64]UserSimple
 	userSimples, done := getUsers(w, userIds, tx, userSimples)
 	if done {
 		return
+	}
+	var transactionEvidences map[int64]TransactionEvidence
+	if len(items) >0 {
+		query, args, err := sqlx.In("SELECT * FROM `transaction_evidences` WHERE `item_id` IN (?)", items)
+		if err != nil {
+			log.Print(err)
+			outputErrorMsg(w, http.StatusInternalServerError, "db error")
+			tx.Rollback()
+			return
+		}
+		var s []TransactionEvidence
+		err = tx.SelectContext(context.Background(), &s, query, args...)
+		if err != nil {
+			log.Print(err)
+			outputErrorMsg(w, http.StatusInternalServerError, "db error")
+			tx.Rollback()
+			return
+		}
+		transactionEvidences = make(map[int64]TransactionEvidence, len(s))
+		for _, c := range s {
+			transactionEvidences[c.ItemID] = c
+		}
 	}
 
 	itemDetails := []ItemDetail{}
@@ -1017,17 +1042,8 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 			itemDetail.Buyer = &buyer
 		}
 
-		transactionEvidence := TransactionEvidence{}
-		err = tx.Get(&transactionEvidence, "SELECT * FROM `transaction_evidences` WHERE `item_id` = ?", item.ID)
-		if err != nil && err != sql.ErrNoRows {
-			// It's able to ignore ErrNoRows
-			log.Print(err)
-			outputErrorMsg(w, http.StatusInternalServerError, "db error")
-			tx.Rollback()
-			return
-		}
-
-		if transactionEvidence.ID > 0 {
+		transactionEvidence, ok := transactionEvidences[item.ID]
+		if ok {
 			shipping := Shipping{}
 			err = tx.Get(&shipping, "SELECT * FROM `shippings` WHERE `transaction_evidence_id` = ?", transactionEvidence.ID)
 			if err == sql.ErrNoRows {
