@@ -953,15 +953,25 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var transactionEvidences map[int64]TransactionEvidence
-	if len(itemIds) >0 {
-		query, args, err := sqlx.In("SELECT * FROM `transaction_evidences` WHERE `item_id` IN (?)", itemIds)
+	transactionEvidences, done2 := getTransactionsByIds(w, itemIds, tx, transactionEvidences)
+	if done2 {
+		return
+	}
+	var transactionIds []interface{}
+	for _, k := range transactionEvidences {
+		transactionIds = append(transactionIds, k.ID)
+	}
+
+	var shippings map[int64]Shipping
+	if len(transactionIds) > 0 {
+		query, args, err := sqlx.In("SELECT * FROM `transaction_evidences` WHERE `item_id` IN (?)", transactionIds)
 		if err != nil {
 			log.Print(err)
 			outputErrorMsg(w, http.StatusInternalServerError, "db error")
 			tx.Rollback()
 			return
 		}
-		var s []TransactionEvidence
+		var s []Shipping
 		err = tx.SelectContext(context.Background(), &s, query, args...)
 		if err != nil {
 			log.Print(err)
@@ -971,7 +981,7 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 		}
 		transactionEvidences = make(map[int64]TransactionEvidence, len(s))
 		for _, c := range s {
-			transactionEvidences[c.ItemID] = c
+			shippings[c.TransactionEvidenceID] = c
 		}
 	}
 
@@ -1022,19 +1032,7 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 
 		transactionEvidence, ok := transactionEvidences[item.ID]
 		if ok {
-			shipping := Shipping{}
-			err = tx.Get(&shipping, "SELECT * FROM `shippings` WHERE `transaction_evidence_id` = ?", transactionEvidence.ID)
-			if err == sql.ErrNoRows {
-				outputErrorMsg(w, http.StatusNotFound, "shipping not found")
-				tx.Rollback()
-				return
-			}
-			if err != nil {
-				log.Print(err)
-				outputErrorMsg(w, http.StatusInternalServerError, "db error")
-				tx.Rollback()
-				return
-			}
+			shipping := shippings[transactionEvidence.ID]
 			ssr, err := APIShipmentStatus(getShipmentServiceURL(), &APIShipmentStatusReq{
 				ReserveID: shipping.ReserveID,
 			})
@@ -1068,6 +1066,31 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json;charset=utf-8")
 	json.NewEncoder(w).Encode(rts)
 
+}
+
+func getTransactionsByIds(w http.ResponseWriter, itemIds []interface{}, tx *sqlx.Tx, transactionEvidences map[int64]TransactionEvidence) (map[int64]TransactionEvidence, bool) {
+	if len(itemIds) > 0 {
+		query, args, err := sqlx.In("SELECT * FROM `transaction_evidences` WHERE `item_id` IN (?)", itemIds)
+		if err != nil {
+			log.Print(err)
+			outputErrorMsg(w, http.StatusInternalServerError, "db error")
+			tx.Rollback()
+			return nil, true
+		}
+		var s []TransactionEvidence
+		err = tx.SelectContext(context.Background(), &s, query, args...)
+		if err != nil {
+			log.Print(err)
+			outputErrorMsg(w, http.StatusInternalServerError, "db error")
+			tx.Rollback()
+			return nil, true
+		}
+		transactionEvidences = make(map[int64]TransactionEvidence, len(s))
+		for _, c := range s {
+			transactionEvidences[c.ItemID] = c
+		}
+	}
+	return transactionEvidences, false
 }
 
 func getUsers(w http.ResponseWriter, userIds []interface{}, tx *sqlx.Tx, userSimples map[int64]UserSimple) (map[int64]UserSimple, bool) {
