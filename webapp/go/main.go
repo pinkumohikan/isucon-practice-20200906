@@ -1413,6 +1413,7 @@ func postBuy(w http.ResponseWriter, r *http.Request) {
 	var pstr *APIPaymentServiceTokenRes
 	var payErr error
 	func() {
+		defer wg.Done()
 		pstr, payErr = APIPaymentToken(getPaymentServiceURL(), &APIPaymentServiceTokenReq{
 			ShopID: PaymentServiceIsucariShopID,
 			Token:  rb.Token,
