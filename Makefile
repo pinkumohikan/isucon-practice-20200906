@@ -39,6 +39,9 @@ truncate-logs:
 kataribe:
 	sudo cat /var/log/nginx/access.log | ../kataribe -f "../kataribe.toml"
 
+overwrite-server-conf:	start-services-app2:
+	sudo cp -f /home/isucon/isucari/servers/mysql/mysql.conf.d/mysqld.cnf /etc/mysql/mysql.conf.d/mysqld.cnf
+
 bench:
 	ssh isucon@18.183.88.60 \
 		"cd ~/isucari && ./bin/benchmarker -target-url=http://172.31.12.14:80 --payment-url=http://172.31.0.9:5555 --shipment-url=http://172.31.0.9:7000"
