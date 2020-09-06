@@ -334,6 +334,7 @@ func main() {
 	for _, c := range categories {
 		parent := categoryMap[c.ParentID]
 		c.ParentCategoryName = parent.CategoryName
+		categoryMap[c.ID] = c
 	}
 
 	mux := goji.NewMux()
