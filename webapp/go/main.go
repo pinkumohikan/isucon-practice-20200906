@@ -573,32 +573,10 @@ func getNewItems(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	userIdUnique := make(map[int64]struct{})
-	var userIds []interface{}
-	for _, i := range items {
-		id := i.SellerID
-		if _, ok := userIdUnique[id]; !ok {
-			userIds = append(userIds, id)
-			userIdUnique[id] = struct{}{}
-		}
-		id = i.BuyerID
-		if _, ok := userIdUnique[i.BuyerID]; !ok {
-			userIds = append(userIds, id)
-			userIdUnique[id] = struct{}{}
-		}
-
-	}
-
-	var userSimples map[int64]UserSimple
-	userSimples, done := getUsers(w, userIds, dbx.MustBegin(), userSimples)
-	if done {
-		return
-	}
-
 	itemSimples := []ItemSimple{}
 	for _, item := range items {
-		seller, ok := userSimples[item.SellerID]
-		if !ok {
+		seller, err := getUserSimpleByID(dbx, item.SellerID)
+		if err != nil {
 			outputErrorMsg(w, http.StatusNotFound, "seller not found")
 			return
 		}
