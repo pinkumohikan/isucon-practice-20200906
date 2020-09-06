@@ -975,8 +975,8 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var transactionEvidences map[int64]TransactionEvidence
-	if len(items) >0 {
-		query, args, err := sqlx.In("SELECT * FROM `transaction_evidences` WHERE `item_id` IN (?)", items)
+	if len(itemIds) >0 {
+		query, args, err := sqlx.In("SELECT * FROM `transaction_evidences` WHERE `item_id` IN (?)", itemIds)
 		if err != nil {
 			log.Print(err)
 			outputErrorMsg(w, http.StatusInternalServerError, "db error")
