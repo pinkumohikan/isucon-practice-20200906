@@ -18,6 +18,9 @@ start-services:
 truncate-logs:
 	sudo truncate --size 0 /var/log/nginx/access.log
 
+kataribe:
+	sudo cat /var/log/nginx/access.log | ../kataribe -f "../kataribe.toml"
+
 bench:
 	ssh isucon@18.183.88.60 \
 		"cd ~/isucari && ./bin/benchmarker -target-url=http://172.31.12.14:80 --payment-url=http://172.31.0.9:5555 --shipment-url=http://172.31.0.9:7000"
