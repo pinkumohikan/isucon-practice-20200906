@@ -964,7 +964,7 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 
 	var shippings map[int64]Shipping
 	if len(transactionIds) > 0 {
-		query, args, err := sqlx.In("SELECT * FROM `transaction_evidences` WHERE `item_id` IN (?)", transactionIds)
+		query, args, err := sqlx.In("SELECT * FROM `shippings` WHERE `transaction_evidence_id` IN (?)", transactionIds)
 		if err != nil {
 			log.Print(err)
 			outputErrorMsg(w, http.StatusInternalServerError, "db error")
@@ -1032,7 +1032,7 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 
 		transactionEvidence, ok := transactionEvidences[item.ID]
 		if ok {
-			shipping := shippings[transactionEvidence.ID]
+			shipping = shippings[transactionEvidence.ID]
 			ssr, err := APIShipmentStatus(getShipmentServiceURL(), &APIShipmentStatusReq{
 				ReserveID: shipping.ReserveID,
 			})
