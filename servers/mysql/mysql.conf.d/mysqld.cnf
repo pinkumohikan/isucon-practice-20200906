@@ -64,7 +64,7 @@ query_cache_size        = 16M
 #
 # Both location gets rotated by the cronjob.
 # Be aware that this log type is a performance killer.
-# As of 5.1 you can enable the log at runtime!
+# As of 5.1 you can enable the log at runtim!
 #general_log_file        = /var/log/mysql/mysql.log
 #general_log             = 1
 #
@@ -73,9 +73,9 @@ query_cache_size        = 16M
 log_error = /var/log/mysql/error.log
 #
 # Here you can see queries with especially long duration
-#slow_query_log		= 1
-#slow_query_log_file	= /var/log/mysql/mysql-slow.log
-#long_query_time = 2
+slow_query_log		= 1
+slow_query_log_file	= /var/log/mysql/mysql-slow.log
+long_query_time = 0.1
 #log-queries-not-using-indexes
 #
 # The following can be used as easy to replay backup logs or for replication.

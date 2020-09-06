@@ -15,6 +15,9 @@ start-services:
 	sudo systemctl start isucari.golang
 	sudo systemctl start nginx
 
+overwrite-server-conf:
+	sudo cp -f /home/isucon/isucari/servers/mysql/mysql.conf.d/mysqld.cnf /etc/mysql/mysql.confreload-server-conf:
+
 truncate-logs:
 	sudo truncate --size 0 /var/log/nginx/access.log
 
