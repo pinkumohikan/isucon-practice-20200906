@@ -933,7 +933,7 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 	for _, i := range items {
 		if _, ok := userIdUnique[i.SellerID]; !ok {
 			userIds = append(userIds, i.SellerID)
-			userIds[i.BuyerID] = struct{}{}
+			userIds[i.SellerID] = struct{}{}
 		}
 		if _, ok := userIdUnique[i.BuyerID]; !ok {
 			userIds = append(userIds, i.BuyerID)
