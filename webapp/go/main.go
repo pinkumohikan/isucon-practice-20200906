@@ -1404,6 +1404,7 @@ func postBuy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.Printf("Item:%d APIShipmentCreate start", targetItem.ID)
 	scr, err := APIShipmentCreate(getShipmentServiceURL(), &APIShipmentCreateReq{
 		ToAddress:   buyer.Address,
 		ToName:      buyer.AccountName,
@@ -1417,7 +1418,9 @@ func postBuy(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
+	log.Printf("Item:%d APIShipmentCreate end", targetItem.ID)
 
+	log.Printf("Item:%d APIPaymentToken start", targetItem.ID)
 	pstr, err := APIPaymentToken(getPaymentServiceURL(), &APIPaymentServiceTokenReq{
 		ShopID: PaymentServiceIsucariShopID,
 		Token:  rb.Token,
@@ -1431,6 +1434,7 @@ func postBuy(w http.ResponseWriter, r *http.Request) {
 		tx.Rollback()
 		return
 	}
+	log.Printf("Item:%d APIPaymentToken end", targetItem.ID)
 
 	if pstr.Status == "invalid" {
 		outputErrorMsg(w, http.StatusBadRequest, "カード情報に誤りがあります")
