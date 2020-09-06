@@ -1344,9 +1344,7 @@ func postBuy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tx := dbx.MustBegin()
-
-	result, err := tx.Exec("UPDATE `items` SET `buyer_id` = ?, `status` = ?, `updated_at` = ? WHERE `id` = ? and `status` = ?",
+	result, err := dbx.Exec("UPDATE `items` SET `buyer_id` = ?, `status` = ?, `updated_at` = ? WHERE `id` = ? and `status` = ?",
 		buyer.ID,
 		ItemStatusTrading,
 		time.Now(),
@@ -1357,7 +1355,6 @@ func postBuy(w http.ResponseWriter, r *http.Request) {
 		log.Print(err)
 
 		outputErrorMsg(w, http.StatusInternalServerError, "db error")
-		tx.Rollback()
 		return
 	}
 	affected, err := result.RowsAffected()
@@ -1365,16 +1362,32 @@ func postBuy(w http.ResponseWriter, r *http.Request) {
 		log.Print(err)
 
 		outputErrorMsg(w, http.StatusInternalServerError, "db error")
-		tx.Rollback()
-		return
 	}
 	if affected != 1 {
 		log.Print("failed to optimistic lock")
 
 		outputErrorMsg(w, http.StatusForbidden, "item is not for sale")
-		tx.Rollback()
 		return
 	}
+
+	transactionEvidenceID, errored := buy(w, result, err, targetItem, buyer, category, seller, rb)
+	if errored {
+		// 販売中状態に戻す
+		_, _ = dbx.Exec("UPDATE `items` SET `buyer_id` = null, `status` = ?, `updated_at` = ? WHERE `id` = ? and `status` = ?",
+			ItemStatusOnSale,
+			time.Now(),
+			targetItem.ID,
+			ItemStatusTrading,
+		)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json;charset=utf-8")
+	json.NewEncoder(w).Encode(resBuy{TransactionEvidenceID: transactionEvidenceID})
+}
+
+func buy(w http.ResponseWriter, result sql.Result, err error, targetItem Item, buyer User, category Category, seller User, rb reqBuy) (int64, bool) {
+	tx := dbx.MustBegin()
 
 	result, err = tx.Exec("INSERT INTO `transaction_evidences` (`seller_id`, `buyer_id`, `status`, `item_id`, `item_name`, `item_price`, `item_description`,`item_category_id`,`item_root_category_id`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
 		targetItem.SellerID,
@@ -1392,7 +1405,7 @@ func postBuy(w http.ResponseWriter, r *http.Request) {
 
 		outputErrorMsg(w, http.StatusInternalServerError, "db error")
 		tx.Rollback()
-		return
+		return 0, true
 	}
 
 	transactionEvidenceID, err := result.LastInsertId()
@@ -1401,7 +1414,7 @@ func postBuy(w http.ResponseWriter, r *http.Request) {
 
 		outputErrorMsg(w, http.StatusInternalServerError, "db error")
 		tx.Rollback()
-		return
+		return 0, true
 	}
 
 	log.Printf("Item:%d APIShipmentCreate start", targetItem.ID)
@@ -1416,7 +1429,7 @@ func postBuy(w http.ResponseWriter, r *http.Request) {
 		outputErrorMsg(w, http.StatusInternalServerError, "failed to request to shipment service")
 		tx.Rollback()
 
-		return
+		return 0, true
 	}
 	log.Printf("Item:%d APIShipmentCreate end", targetItem.ID)
 
@@ -1432,26 +1445,26 @@ func postBuy(w http.ResponseWriter, r *http.Request) {
 
 		outputErrorMsg(w, http.StatusInternalServerError, "payment service is failed")
 		tx.Rollback()
-		return
+		return 0, true
 	}
 	log.Printf("Item:%d APIPaymentToken end", targetItem.ID)
 
 	if pstr.Status == "invalid" {
 		outputErrorMsg(w, http.StatusBadRequest, "カード情報に誤りがあります")
 		tx.Rollback()
-		return
+		return 0, true
 	}
 
 	if pstr.Status == "fail" {
 		outputErrorMsg(w, http.StatusBadRequest, "カードの残高が足りません")
 		tx.Rollback()
-		return
+		return 0, true
 	}
 
 	if pstr.Status != "ok" {
 		outputErrorMsg(w, http.StatusBadRequest, "想定外のエラー")
 		tx.Rollback()
-		return
+		return 0, true
 	}
 
 	_, err = tx.Exec("INSERT INTO `shippings` (`transaction_evidence_id`, `status`, `item_name`, `item_id`, `reserve_id`, `reserve_time`, `to_address`, `to_name`, `from_address`, `from_name`, `img_binary`) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
@@ -1472,13 +1485,11 @@ func postBuy(w http.ResponseWriter, r *http.Request) {
 
 		outputErrorMsg(w, http.StatusInternalServerError, "db error")
 		tx.Rollback()
-		return
+		return 0, true
 	}
 
 	tx.Commit()
-
-	w.Header().Set("Content-Type", "application/json;charset=utf-8")
-	json.NewEncoder(w).Encode(resBuy{TransactionEvidenceID: transactionEvidenceID})
+	return transactionEvidenceID, false
 }
 
 func postShip(w http.ResponseWriter, r *http.Request) {
