@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	crand "crypto/rand"
 	"database/sql"
 	"encoding/json"
@@ -13,6 +14,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -926,10 +928,67 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	userIdUnique := make(map[int64]struct{})
+	var userIds []interface{}
+	for _, i := range items {
+		id := i.SellerID
+		if _, ok := userIdUnique[id]; !ok {
+			userIds = append(userIds, id)
+			userIdUnique[id] = struct{}{}
+		}
+		id = i.BuyerID
+		if _, ok := userIdUnique[i.BuyerID]; !ok {
+			userIds = append(userIds, id)
+			userIdUnique[id] = struct{}{}
+		}
+	}
+	var itemIds []interface{}
+	for _, j := range items {
+		itemIds = append(itemIds, j.ID)
+	}
+
+	var userSimples map[int64]UserSimple
+	userSimples, done := getUsers(w, userIds, tx, userSimples)
+	if done {
+		return
+	}
+	var transactionEvidences map[int64]TransactionEvidence
+	transactionEvidences, done2 := getTransactionsByIds(w, itemIds, tx, transactionEvidences)
+	if done2 {
+		return
+	}
+	var transactionIds []interface{}
+	for _, k := range transactionEvidences {
+		transactionIds = append(transactionIds, k.ID)
+	}
+
+	var shippings map[int64]Shipping
+	if len(transactionIds) > 0 {
+		query, args, err := sqlx.In("SELECT * FROM `shippings` WHERE `transaction_evidence_id` IN (?)", transactionIds)
+		if err != nil {
+			log.Print(err)
+			outputErrorMsg(w, http.StatusInternalServerError, "db error")
+			tx.Rollback()
+			return
+		}
+		var s []Shipping
+		err = tx.SelectContext(context.Background(), &s, query, args...)
+		if err != nil {
+			log.Print(err)
+			outputErrorMsg(w, http.StatusInternalServerError, "db error")
+			tx.Rollback()
+			return
+		}
+		shippings = make(map[int64]Shipping, len(s))
+		for _, c := range s {
+			shippings[c.TransactionEvidenceID] = c
+		}
+	}
+
 	itemDetails := []ItemDetail{}
 	for _, item := range items {
-		seller, err := getUserSimpleByID(tx, item.SellerID)
-		if err != nil {
+		seller, ok := userSimples[item.SellerID]
+		if !ok {
 			outputErrorMsg(w, http.StatusNotFound, "seller not found")
 			tx.Rollback()
 			return
@@ -961,8 +1020,8 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if item.BuyerID != 0 {
-			buyer, err := getUserSimpleByID(tx, item.BuyerID)
-			if err != nil {
+			buyer, ok := userSimples[item.BuyerID]
+			if !ok {
 				outputErrorMsg(w, http.StatusNotFound, "buyer not found")
 				tx.Rollback()
 				return
@@ -971,43 +1030,12 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 			itemDetail.Buyer = &buyer
 		}
 
-		transactionEvidence := TransactionEvidence{}
-		err = tx.Get(&transactionEvidence, "SELECT * FROM `transaction_evidences` WHERE `item_id` = ?", item.ID)
-		if err != nil && err != sql.ErrNoRows {
-			// It's able to ignore ErrNoRows
-			log.Print(err)
-			outputErrorMsg(w, http.StatusInternalServerError, "db error")
-			tx.Rollback()
-			return
-		}
-
-		if transactionEvidence.ID > 0 {
-			shipping := Shipping{}
-			err = tx.Get(&shipping, "SELECT * FROM `shippings` WHERE `transaction_evidence_id` = ?", transactionEvidence.ID)
-			if err == sql.ErrNoRows {
-				outputErrorMsg(w, http.StatusNotFound, "shipping not found")
-				tx.Rollback()
-				return
-			}
-			if err != nil {
-				log.Print(err)
-				outputErrorMsg(w, http.StatusInternalServerError, "db error")
-				tx.Rollback()
-				return
-			}
-			ssr, err := APIShipmentStatus(getShipmentServiceURL(), &APIShipmentStatusReq{
-				ReserveID: shipping.ReserveID,
-			})
-			if err != nil {
-				log.Print(err)
-				outputErrorMsg(w, http.StatusInternalServerError, "failed to request to shipment service")
-				tx.Rollback()
-				return
-			}
-
+		transactionEvidence, ok := transactionEvidences[item.ID]
+		if ok {
+			shipping := shippings[transactionEvidence.ID]
 			itemDetail.TransactionEvidenceID = transactionEvidence.ID
 			itemDetail.TransactionEvidenceStatus = transactionEvidence.Status
-			itemDetail.ShippingStatus = ssr.Status
+			itemDetail.ShippingStatus = shipping.Status
 		}
 
 		itemDetails = append(itemDetails, itemDetail)
@@ -1028,6 +1056,60 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json;charset=utf-8")
 	json.NewEncoder(w).Encode(rts)
 
+}
+
+func getTransactionsByIds(w http.ResponseWriter, itemIds []interface{}, tx *sqlx.Tx, transactionEvidences map[int64]TransactionEvidence) (map[int64]TransactionEvidence, bool) {
+	if len(itemIds) > 0 {
+		query, args, err := sqlx.In("SELECT * FROM `transaction_evidences` WHERE `item_id` IN (?)", itemIds)
+		if err != nil {
+			log.Print(err)
+			outputErrorMsg(w, http.StatusInternalServerError, "db error")
+			tx.Rollback()
+			return nil, true
+		}
+		var s []TransactionEvidence
+		err = tx.SelectContext(context.Background(), &s, query, args...)
+		if err != nil {
+			log.Print(err)
+			outputErrorMsg(w, http.StatusInternalServerError, "db error")
+			tx.Rollback()
+			return nil, true
+		}
+		transactionEvidences = make(map[int64]TransactionEvidence, len(s))
+		for _, c := range s {
+			transactionEvidences[c.ItemID] = c
+		}
+	}
+	return transactionEvidences, false
+}
+
+func getUsers(w http.ResponseWriter, userIds []interface{}, tx *sqlx.Tx, userSimples map[int64]UserSimple) (map[int64]UserSimple, bool) {
+	if len(userIds) > 0 {
+		query, args, err := sqlx.In("SELECT * FROM `users` WHERE `id` IN (?)", userIds)
+		if err != nil {
+			log.Print(err)
+			outputErrorMsg(w, http.StatusInternalServerError, "db error")
+			tx.Rollback()
+			return nil, true
+		}
+		var s []User
+		err = tx.SelectContext(context.Background(), &s, query, args...)
+		if err != nil {
+			log.Print(err)
+			outputErrorMsg(w, http.StatusInternalServerError, "db error")
+			tx.Rollback()
+			return nil, true
+		}
+		userSimples = make(map[int64]UserSimple, len(s))
+		for _, u := range s {
+			userSimples[u.ID] = UserSimple{
+				ID:           u.ID,
+				AccountName:  u.AccountName,
+				NumSellItems: u.NumSellItems,
+			}
+		}
+	}
+	return userSimples, false
 }
 
 func getItem(w http.ResponseWriter, r *http.Request) {
@@ -1408,7 +1490,6 @@ func buy(w http.ResponseWriter, result sql.Result, err error, targetItem Item, b
 		tx.Rollback()
 		return 0, true
 	}
-
 	transactionEvidenceID, err := result.LastInsertId()
 	if err != nil {
 		log.Print(err)
@@ -1419,21 +1500,21 @@ func buy(w http.ResponseWriter, result sql.Result, err error, targetItem Item, b
 	}
 
 	log.Printf("Item:%d APIShipmentCreate start", targetItem.ID)
-	scr, err := APIShipmentCreate(getShipmentServiceURL(), &APIShipmentCreateReq{
-		ToAddress:   buyer.Address,
-		ToName:      buyer.AccountName,
-		FromAddress: seller.Address,
-		FromName:    seller.AccountName,
-	})
-	if err != nil {
-		log.Print(err)
-		outputErrorMsg(w, http.StatusInternalServerError, "failed to request to shipment service")
-		tx.Rollback()
 
-		return 0, true
-	}
-	log.Printf("Item:%d APIShipmentCreate end", targetItem.ID)
 
+	var wg sync.WaitGroup
+	var scr *APIShipmentCreateRes
+	var shipErr error
+	wg.Add(1)
+	func() {
+		defer wg.Done()
+		scr, shipErr = APIShipmentCreate(getShipmentServiceURL(), &APIShipmentCreateReq{
+			ToAddress:   buyer.Address,
+			ToName:      buyer.AccountName,
+			FromAddress: seller.Address,
+			FromName:    seller.AccountName,
+		})
+	}()
 	log.Printf("Item:%d APIPaymentToken start", targetItem.ID)
 	pstr, err := APIPaymentToken(getPaymentServiceURL(), &APIPaymentServiceTokenReq{
 		ShopID: PaymentServiceIsucariShopID,
@@ -1441,6 +1522,15 @@ func buy(w http.ResponseWriter, result sql.Result, err error, targetItem Item, b
 		APIKey: PaymentServiceIsucariAPIKey,
 		Price:  targetItem.Price,
 	})
+
+	wg.Wait()
+	if shipErr != nil {
+		log.Print(shipErr)
+		outputErrorMsg(w, http.StatusInternalServerError, "failed to request to shipment service")
+		tx.Rollback()
+		return 0, true
+	}
+
 	if err != nil {
 		log.Print(err)
 
