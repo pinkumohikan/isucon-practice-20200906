@@ -6,10 +6,10 @@ build:
 	make -C webapp/go/ isucari
 
 sync-build-file-app2:
-	scp -C webapp/go/isucari isucon@18.179.19.193:~/isucari/webapp/go
+	scp -C webapp/go/isucari isucon@52.196.20.1:~/isucari/webapp/go
 
 sync-build-file-app3:
-	scp -C webapp/go/isucari isucon@103.4.14.236:~/isucari/webapp/go
+	scp -C webapp/go/isucari isucon@18.181.87.63:~/isucari/webapp/go
 
 stop-services:
 	sudo systemctl stop nginx
@@ -17,11 +17,11 @@ stop-services:
 	#sudo systemctl stop mysql
 
 stop-services-app2:
-	ssh isucon@18.179.19.193 sudo systemctl stop isucari.golang
-	ssh isucon@18.179.19.193 sudo systemctl stop mysql
+	ssh isucon@52.196.20.1 sudo systemctl stop isucari.golang
+	ssh isucon@52.196.20.1 sudo systemctl stop mysql
 
 stop-services-app3:
-	ssh isucon@103.4.14.236 sudo systemctl stop isucari.golang
+	ssh isucon@18.181.87.63 sudo systemctl stop isucari.golang
 
 start-services:
 	#sudo systemctl start mysql
@@ -29,11 +29,11 @@ start-services:
 	sudo systemctl start nginx
 
 start-services-app2:
-	ssh isucon@18.179.19.193 sudo systemctl start mysql
-	ssh isucon@18.179.19.193 sudo systemctl start isucari.golang
+	ssh isucon@52.196.20.1 sudo systemctl start mysql
+	ssh isucon@52.196.20.1 sudo systemctl start isucari.golang
 
 start-services-app3:
-	ssh isucon@103.4.14.236 sudo systemctl start isucari.golang
+	ssh isucon@18.181.87.63 sudo systemctl start isucari.golang
 
 truncate-logs:
 	sudo truncate --size 0 /var/log/nginx/access.log
@@ -45,7 +45,7 @@ overwrite-server-conf:
 	sudo cp -f /home/isucon/isucari/servers/mysql/mysql.conf.d/mysqld.cnf /etc/mysql/mysql.conf.d/mysqld.cnf
 
 bench:
-	ssh isucon@18.183.88.60 \
+	ssh isucon@18.181.252.41 \
 		"cd ~/isucari && ./bin/benchmarker -target-url=http://172.31.12.14:80 --payment-url=http://172.31.0.9:5555 --shipment-url=http://172.31.0.9:7000"
 
 init:
