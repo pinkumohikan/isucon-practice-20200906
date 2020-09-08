@@ -66,6 +66,7 @@ var (
 	dbx         *sqlx.DB
 	store       sessions.Store
 	categoryMap map[int]Category
+	itemMuxMap  map[int64]sync.RWMutex
 )
 
 type Config struct {
@@ -1426,6 +1427,12 @@ func postBuy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	 m, ok := itemMuxMap[targetItem.ID]
+	 if ok {
+		m.Lock()
+	}
+	defer m.Unlock()
+
 	result, err := dbx.Exec("UPDATE `items` SET `buyer_id` = ?, `status` = ?, `updated_at` = ? WHERE `id` = ? and `status` = ?",
 		buyer.ID,
 		ItemStatusTrading,
@@ -2135,6 +2142,7 @@ func postSell(w http.ResponseWriter, r *http.Request) {
 		outputErrorMsg(w, http.StatusInternalServerError, "db error")
 		return
 	}
+	itemMuxMap[itemID] = sync.RWMutex{}
 
 	now := time.Now()
 	_, err = tx.Exec("UPDATE `users` SET `num_sell_items`=?, `last_bump`=? WHERE `id`=?",
