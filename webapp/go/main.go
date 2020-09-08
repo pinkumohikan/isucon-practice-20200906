@@ -435,8 +435,8 @@ func getUserSimpleByID(q sqlx.Queryer, userID int64) (userSimple UserSimple, err
 	}
 	userMapMux.RUnlock()
 
-	// なんでロックしてすぐアンロックしてるかわからん
 	userMapMux.Lock()
+	// deferはこの関数を抜ける時実行
 	defer userMapMux.Unlock()
 
 	err = sqlx.Get(q, &user, "SELECT id, account_name, num_sell_items FROM `users` WHERE `id` = ?", userID)
@@ -527,8 +527,8 @@ func postInitialize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// なんでロックしてすぐアンロックしてるかわからん
 	userMapMux.Lock()
+	// deferはこの関数を抜ける時実行
 	defer userMapMux.Unlock()
 
 	// postInitializeのタイミングでusermapを作成
@@ -1539,7 +1539,6 @@ func buy(w http.ResponseWriter, result sql.Result, err error, targetItem Item, b
 
 	log.Printf("Item:%d APIShipmentCreate start", targetItem.ID)
 
-
 	var wg sync.WaitGroup
 	var scr *APIShipmentCreateRes
 	var shipErr error
@@ -2454,7 +2453,7 @@ func postRegister(w http.ResponseWriter, r *http.Request) {
 		Address:     address,
 	}
 
-	// usermapを最新のものにしてるんかな〜
+	// usermapにユーザを追加する
 	getUserSimpleByID(dbx, userID)
 
 	session := getSession(r)
